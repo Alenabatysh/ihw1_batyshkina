@@ -1,0 +1,13 @@
+total_customers = 200
+queue_capacity = 20
+shopping_time_min = 5
+shopping_time_max = 20
+arrival_interval_min = 1
+arrival_interval_max = 3
+items_min = 1
+items_max = 10
+item_service_time = 8
+queue_strategy = 0
+work_day_duration = 3600
+random_seed = 42
+display_delay_ms = 0
