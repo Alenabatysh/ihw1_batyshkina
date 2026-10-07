@@ -4,8 +4,11 @@
 #include "events.h"
 #include "io.h"
 #include "rng.h"
+#include <signal.h>
 #include <stdlib.h>
 #include <unistd.h>
+
+extern volatile sig_atomic_t g_interrupted;
 
 // Initialize simulation state: cashiers, queues, statistics, and event queue
 STATUS sim_init(Simulation *sim, const Config *config) {
@@ -224,6 +227,11 @@ void sim_run(Simulation *sim) {
 
   Event event;
   while (!eq_is_empty(sim->event_queue)) {
+    if (g_interrupted) {
+      io_printf_log("\nSimulation interrupted by user\n");
+      break;
+    }
+
     STATUS status = eq_pop(sim->event_queue, &event);
     if (status != STATUS_OK) {
       break;

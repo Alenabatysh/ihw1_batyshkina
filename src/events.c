@@ -110,7 +110,7 @@ void handle_finish_shopping(Simulation *sim, Event event) {
   sim_add_event(sim, queue_choice);
 }
 
-// Process queue selection: add to queue or schedule leave if full
+// Process queue selection: add to queue or switch to another if full
 void handle_queue_choice(Simulation *sim, Event event) {
   Customer *customer = sim_get_customer(sim, event.entity_id);
   if (customer == NULL)
@@ -123,16 +123,33 @@ void handle_queue_choice(Simulation *sim, Event event) {
                 queue_id, sim->config.queue_strategy);
 
   Queue *queue = sim_get_queue(sim, queue_id);
-  if (queue->size >= queue->capacity) {
-    io_printf_log("Queue %d is full! Customer %d leaves\n", queue_id,
-                  customer->id);
 
-    Event leave = {.type = EVENT_LEAVE_NO_SERVICE,
-                   .time = event.time,
-                   .entity_id = customer->id,
-                   .data = 0};
-    sim_add_event(sim, leave);
-    return;
+  if (queue->size >= queue->capacity) {
+    int alt_queue_id = (queue_id == 0) ? 1 : 0;
+    Queue *alt_queue = sim_get_queue(sim, alt_queue_id);
+
+    if (alt_queue->size < alt_queue->capacity) {
+      io_printf_log("Queue %d is full! Customer %d switches to queue %d\n",
+                    queue_id, customer->id, alt_queue_id);
+
+      Event switch_event = {.type = EVENT_QUEUE_SWITCH,
+                            .time = event.time,
+                            .entity_id = customer->id,
+                            .data = alt_queue_id};
+      display_add_event(switch_event);
+
+      queue_id = alt_queue_id;
+      customer->queue_id = alt_queue_id;
+      queue = alt_queue;
+    } else {
+      io_printf_log("Both queues are full! Customer %d leaves\n", customer->id);
+      Event leave = {.type = EVENT_LEAVE_NO_SERVICE,
+                     .time = event.time,
+                     .entity_id = customer->id,
+                     .data = 0};
+      sim_add_event(sim, leave);
+      return;
+    }
   }
 
   STATUS status = sim_add_to_queue(sim, queue_id, customer->id);
@@ -174,7 +191,8 @@ void handle_leave_no_service(Simulation *sim, Event event) {
                 customer->id, event.time - customer->arrival_time);
 }
 
-// Process cashier wake up: change state and start checkout for the first customer
+// Process cashier wake up: change state and start checkout for the first
+// customer
 void handle_cashier_wake(Simulation *sim, Event event) {
   int queue_id = event.entity_id;
   Cashier *cashier = sim_get_cashier(sim, queue_id);
@@ -223,7 +241,8 @@ void handle_start_checkout(Simulation *sim, Event event) {
   sim_add_event(sim, finish_checkout);
 }
 
-// Process checkout finish: update stats, remove from queue, and serve next or sleep
+// Process checkout finish: update stats, remove from queue, and serve next or
+// sleep
 void handle_finish_checkout(Simulation *sim, Event event) {
   int queue_id = event.entity_id;
   int customer_id = event.data;
@@ -264,7 +283,8 @@ void handle_finish_checkout(Simulation *sim, Event event) {
   }
 }
 
-// Process queue switch check: start checkout if cashier is idle and queue is not empty
+// Process queue switch check: start checkout if cashier is idle and queue is
+// not empty
 void handle_queue_switch(Simulation *sim, Event event) {
   int queue_id = event.entity_id;
   Cashier *cashier = sim_get_cashier(sim, queue_id);

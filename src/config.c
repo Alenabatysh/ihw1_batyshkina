@@ -136,7 +136,7 @@ STATUS config_validate(const Config *config) {
   }
 
   // Check positive values and valid ranges
-  if (config->total_customers <= 0) {
+  if (config->total_customers <= 0 || config->total_customers > MAX_CUSTOMERS) {
     return STATUS_ERROR;
   }
 

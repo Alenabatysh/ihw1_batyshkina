@@ -8,19 +8,11 @@
 #include <signal.h>
 #include <stdlib.h>
 
-// Global pointer to simulation for signal handler access
-static Simulation *g_sim = NULL;
+volatile sig_atomic_t g_interrupted = 0;
 
-// SIGINT handler: cleanup and print stats on Ctrl+C
 void sigint_handler(int sig) {
   (void)sig;
-  display_cleanup();
-  if (g_sim != NULL) {
-    sim_print_stats(g_sim);
-    sim_destroy(g_sim);
-  }
-  io_close_log();
-  exit(0);
+  g_interrupted = 1;
 }
 
 // Program entry point
@@ -61,8 +53,11 @@ int main(int argc, char *argv[]) {
 
   // Create and initialize simulation state
   Simulation sim;
-  g_sim = &sim;
-  signal(SIGINT, sigint_handler);
+  struct sigaction sa;
+  sa.sa_handler = sigint_handler;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = 0;
+  sigaction(SIGINT, &sa, NULL);
 
   status = sim_init(&sim, &config);
   if (status != STATUS_OK) {
