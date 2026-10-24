@@ -120,7 +120,7 @@ void sim_start(Simulation *sim) {
 // Wait for all customers, cashiers, and display thread to finish
 void sim_wait_completion(Simulation *sim) {
   // Wait for all customer threads to finish being served
-  for (int i = 0; i < sim->customers_count; i++) {
+  for (int i = 0; i < sim->customers_generated; i++) {
     pthread_join(sim->customers[i].thread, NULL);
   }
 
@@ -148,7 +148,7 @@ void sim_wait_completion(Simulation *sim) {
 
 // Get customer pointer by ID
 Customer *sim_get_customer(Simulation *sim, int id) {
-  if (!sim || id < 0 || id >= sim->customers_count)
+  if (!sim || id < 0 || id >= sim->customers_generated)
     return NULL;
   return &sim->customers[id];
 }
@@ -182,12 +182,12 @@ STATUS sim_print_stats(const Simulation *sim) {
   io_printf_both("Total left (no serv.): %d\n",
                  sim->stats.total_left_no_service);
 
-  if (sim->stats.total_served > 0) {
-    io_printf_both("Average wait time:     %.2f sec\n",
-                   (double)sim->stats.total_wait_time /
-                       sim->stats.total_served);
+  if (sim->stats.total_arrived > 0) {
+    io_printf_both("Average shopping time: %.2f sec\n",
+                   (double)sim->stats.total_shopping_time /
+                       sim->stats.total_arrived);
   } else {
-    io_printf_both("Average wait time:     N/A\n");
+    io_printf_both("Average shopping time: N/A\n");
   }
 
   io_printf_both("Max queue 0 size:      %d\n", sim->stats.max_queue_0_size);
