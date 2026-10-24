@@ -3,28 +3,28 @@
 
 #include "types.h"
 
+// Initialize simulation state, mutexes, and semaphores/condvars
 STATUS sim_init(Simulation *sim, const Config *config);
 
+// Destroy mutexes, semaphores/condvars, and free allocated memory
 void sim_destroy(Simulation *sim);
 
-STATUS sim_add_event(Simulation *sim, Event event);
-
+// Get customer pointer by ID
 Customer *sim_get_customer(Simulation *sim, int customer_id);
 
+// Get cashier pointer by ID
 Cashier *sim_get_cashier(Simulation *sim, int cashier_id);
 
+// Get queue pointer by ID
 Queue *sim_get_queue(Simulation *sim, int queue_id);
 
-STATUS sim_add_to_queue(Simulation *sim, int queue_id, int customer_id);
+// Start cashier, generator, and display threads
+void sim_start(Simulation *sim);
 
-STATUS sim_remove_from_queue(Simulation *sim, int queue_id, int customer_id);
+// Wait for all customer, cashier, and display threads to finish
+void sim_wait_completion(Simulation *sim);
 
-int sim_choose_queue(Simulation *sim);
-
-void sim_schedule_initial(Simulation *sim);
-
-void sim_run(Simulation *sim);
-
+// Print final simulation statistics to console and log
 STATUS sim_print_stats(const Simulation *sim);
 
 #endif

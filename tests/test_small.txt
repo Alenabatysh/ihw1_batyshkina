@@ -11,3 +11,4 @@ queue_strategy = 0
 work_day_duration = 300
 random_seed = 42
 display_delay_ms = 0
+time_scale = 10

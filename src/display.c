@@ -54,12 +54,9 @@ static void draw_row(const char *content) {
   printf("|\n");
 }
 
-// Render the main simulation dashboard
-void display_render(const Simulation *sim) {
-  // Move cursor to top-left corner to overwrite previous frame
+void display_render(Simulation *sim) {
   printf("\033[H");
 
-  // Draw header section
   draw_line();
   draw_row("SUPERMARKET SIMULATION");
 
@@ -68,14 +65,16 @@ void display_render(const Simulation *sim) {
            sim->config.work_day_duration);
   draw_row(buf);
 
-  // Draw statistics section
   draw_line();
+
+  // Lock stats mutex to safely read statistics
+  pthread_mutex_lock(&sim->stats.mutex);
   snprintf(buf, sizeof(buf), "Arrived: %-4d  Served: %-4d  Left: %-4d",
            sim->stats.total_arrived, sim->stats.total_served,
            sim->stats.total_left_no_service);
+  pthread_mutex_unlock(&sim->stats.mutex);
   draw_row(buf);
 
-  // Draw cashier and queue status section
   draw_line();
   for (int i = 0; i < NUM_CASHIERS; i++) {
     const Cashier *cashier = &sim->cashiers[i];
@@ -85,19 +84,19 @@ void display_render(const Simulation *sim) {
     int pos = 0;
     pos += snprintf(row + pos, sizeof(row) - pos, "Cashier %d: ", i);
 
-    // Add customers currently in queue
+    // Lock queue mutex to safely read queue contents
+    pthread_mutex_lock((pthread_mutex_t *)&queue->mutex);
     for (int j = 0; j < queue->size && pos < (int)sizeof(row) - 10; j++) {
       pos += snprintf(row + pos, sizeof(row) - pos, "[C%d]",
                       queue->customer_ids[j]);
     }
+    pthread_mutex_unlock((pthread_mutex_t *)&queue->mutex);
 
-    // Pad row to fixed width
     while (pos < 30) {
       row[pos++] = ' ';
     }
     row[pos] = '\0';
 
-    // Append cashier status
     if (cashier->is_sleeping) {
       snprintf(row + pos, sizeof(row) - pos, "sleeping");
     } else if (cashier->current_customer_id >= 0) {
@@ -110,14 +109,11 @@ void display_render(const Simulation *sim) {
     draw_row(row);
   }
 
-  // Draw recent events section
   draw_line();
   draw_row("Recent events:");
 
-  // Calculate start index for circular buffer
   int start = (recent_count < DISPLAY_MAX_EVENTS) ? 0 : recent_index;
 
-  // Print events in reverse chronological order
   for (int i = 0; i < recent_count; i++) {
     int idx = (start + recent_count - 1 - i) % DISPLAY_MAX_EVENTS;
     Event e = recent_events[idx];
@@ -127,16 +123,11 @@ void display_render(const Simulation *sim) {
     draw_row(buf);
   }
 
-  // Fill empty rows if buffer is not full
   for (int i = recent_count; i < DISPLAY_MAX_EVENTS; i++) {
     draw_row("");
   }
 
-  // Draw bottom border
   draw_line();
-
-  // Clear remaining lines from previous frame
   printf("\033[J");
-
   fflush(stdout);
 }
