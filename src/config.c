@@ -21,6 +21,7 @@ void config_set_defaults(Config *config) {
   config->work_day_duration = 3600;
   config->random_seed = 0;
   config->display_delay_ms = 25;
+  config->time_scale = 1;
 }
 
 // Load configuration from file, parse key=value pairs
@@ -117,6 +118,8 @@ STATUS config_load(const char *filename, Config *config) {
       config->random_seed = (unsigned int)atoi(value);
     } else if (strcmp(key, "display_delay_ms") == 0) {
       config->display_delay_ms = atoi(value);
+    } else if (strcmp(key, "time_scale") == 0) {
+      config->time_scale = atoi(value);
     }
 
     // Move to next line
