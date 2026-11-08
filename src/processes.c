@@ -5,9 +5,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-// Cashier process routine
+// Cashier process routine: loops, serving customers one by one
 void cashier_process(Simulation *sim, int cashier_id) {
   while (1) {
+    // Check for termination conditions
     sem_wait(MUTEX_STATS);
     int interrupted = sim->interrupted || sim->simulation_finished;
     int entrance_closed = sim->entrance_closed;
@@ -19,6 +20,7 @@ void cashier_process(Simulation *sim, int cashier_id) {
     if (interrupted)
       break;
 
+    // If entrance is closed and queue is empty + all customers processed, exit
     if (entrance_closed) {
       sem_wait(MUTEX_QUEUE(cashier_id));
       int q_size = sim->queues[cashier_id].size;
@@ -29,15 +31,18 @@ void cashier_process(Simulation *sim, int cashier_id) {
       }
     }
 
+    // Sleep until a customer arrives (blocks until sem_post)
     sem_wait(CUSTOMERS_READY(cashier_id));
 
+    // Extract the first customer from queue under lock
     sem_wait(MUTEX_QUEUE(cashier_id));
     if (sim->queues[cashier_id].size == 0) {
       sem_post(MUTEX_QUEUE(cashier_id));
-      continue;
+      continue; // Spurious wakeup
     }
 
     int cust_id = sim->queues[cashier_id].customer_ids[0];
+    // Shift queue left to remove the served customer
     for (int i = 0; i < sim->queues[cashier_id].size - 1; i++) {
       sim->queues[cashier_id].customer_ids[i] =
           sim->queues[cashier_id].customer_ids[i + 1];
@@ -45,6 +50,7 @@ void cashier_process(Simulation *sim, int cashier_id) {
     sim->queues[cashier_id].size--;
     sem_post(MUTEX_QUEUE(cashier_id));
 
+    // Mark cashier as busy (for display)
     sem_wait(MUTEX_QUEUE(cashier_id));
     sim->cashiers[cashier_id].is_sleeping = 0;
     sim->cashiers[cashier_id].current_customer_id = cust_id;
@@ -52,6 +58,7 @@ void cashier_process(Simulation *sim, int cashier_id) {
 
     Customer *cust = &sim->customers[cust_id];
 
+    // Record service start time
     sem_wait(MUTEX_TIME);
     cust->service_start_time = sim->current_time;
     sem_post(MUTEX_TIME);
@@ -62,8 +69,9 @@ void cashier_process(Simulation *sim, int cashier_id) {
         "Cashier %d starts serving customer %d (items: %d, time: %d sec)\n",
         cashier_id, cust_id, cust->items_count, service_time);
 
-    usleep(service_time * 1000 * sim->config.time_scale);
+    usleep(service_time * 1000 * sim->config.time_scale); // Simulate service
 
+    // Update statistics under lock
     sem_wait(MUTEX_STATS);
     sim->cashiers[cashier_id].total_served++;
     sim->cashiers[cashier_id].total_service_time += service_time;
@@ -75,23 +83,27 @@ void cashier_process(Simulation *sim, int cashier_id) {
     io_printf_log("Cashier %d finished serving customer %d\n", cashier_id,
                   cust_id);
 
+    // Mark cashier as idle
     sem_wait(MUTEX_QUEUE(cashier_id));
     sim->cashiers[cashier_id].current_customer_id = -1;
     sim->cashiers[cashier_id].is_sleeping = 1;
     sem_post(MUTEX_QUEUE(cashier_id));
 
+    // Signal the customer that service is done
     sem_post(SERVICE_DONE(cust_id));
   }
 }
 
-// Customer process routine
+// Customer process routine: shops, chooses queue, waits for service
 void customer_process(Simulation *sim, int customer_id) {
   Customer *cust = &sim->customers[customer_id];
 
+  // Simulate shopping time
   int shop_time =
       rng_range(sim->config.shopping_time_min, sim->config.shopping_time_max);
   usleep(shop_time * 1000 * sim->config.time_scale);
 
+  // If Ctrl+C pressed while shopping — leave without service
   if (sim->interrupted) {
     sem_wait(MUTEX_STATS);
     sim->stats.total_left_no_service++;
@@ -99,10 +111,12 @@ void customer_process(Simulation *sim, int customer_id) {
     return;
   }
 
+  // Record shopping completion time
   sem_wait(MUTEX_TIME);
   cust->shopping_done_time = sim->current_time;
   sem_post(MUTEX_TIME);
 
+  // Accumulate shopping time statistics
   sem_wait(MUTEX_STATS);
   sim->stats.total_shopping_time +=
       (cust->shopping_done_time - cust->arrival_time);
@@ -110,6 +124,7 @@ void customer_process(Simulation *sim, int customer_id) {
 
   io_printf_log("Customer %d finished shopping\n", cust->id);
 
+  // Choose queue according to configured strategy
   sem_wait(MUTEX_QUEUE(0));
   sem_wait(MUTEX_QUEUE(1));
 
@@ -128,6 +143,7 @@ void customer_process(Simulation *sim, int customer_id) {
   cust->queue_id = q_id;
   io_printf_log("Customer %d chooses queue %d\n", cust->id, q_id);
 
+  // Another Ctrl+C check before joining queue
   if (sim->interrupted) {
     sem_wait(MUTEX_STATS);
     sim->stats.total_left_no_service++;
@@ -135,16 +151,19 @@ void customer_process(Simulation *sim, int customer_id) {
     return;
   }
 
+  // Try to join the chosen queue
   int final_q = q_id;
   sem_wait(MUTEX_QUEUE(final_q));
 
   if (sim->queues[final_q].size >= sim->queues[final_q].capacity) {
     sem_post(MUTEX_QUEUE(final_q));
 
+    // Queue is full — try the other one
     int alt_id = (final_q == 0) ? 1 : 0;
     sem_wait(MUTEX_QUEUE(alt_id));
 
     if (sim->queues[alt_id].size >= sim->queues[alt_id].capacity) {
+      // Both queues are full — leave without service
       sem_post(MUTEX_QUEUE(alt_id));
       sem_wait(MUTEX_STATS);
       sim->stats.total_left_no_service++;
@@ -159,9 +178,11 @@ void customer_process(Simulation *sim, int customer_id) {
     final_q = alt_id;
   }
 
+  // Add customer ID to the queue
   sim->queues[final_q].customer_ids[sim->queues[final_q].size++] = cust->id;
   cust->queue_id = final_q;
 
+  // Update max queue size stats
   sem_wait(MUTEX_STATS);
   if (final_q == 0 && sim->queues[final_q].size > sim->stats.max_queue_0_size)
     sim->stats.max_queue_0_size = sim->queues[final_q].size;
@@ -171,7 +192,9 @@ void customer_process(Simulation *sim, int customer_id) {
 
   sem_post(MUTEX_QUEUE(final_q));
 
+  // Wake up cashier of that queue
   sem_post(CUSTOMERS_READY(final_q));
 
+  // Wait until cashier signals our service is complete
   sem_wait(SERVICE_DONE(cust->id));
 }

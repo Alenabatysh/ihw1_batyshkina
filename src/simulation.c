@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+// Global semaphore pointers for named-semaphore version (USE_NAMED_SEM)
 #ifdef USE_NAMED_SEM
 sem_t *g_mutex_stats = NULL;
 sem_t *g_mutex_time = NULL;
@@ -15,11 +16,12 @@ sem_t *g_customers_ready[NUM_CASHIERS] = {NULL};
 sem_t *g_service_done[MAX_CUSTOMERS] = {NULL};
 #endif
 
-// Initialize simulation state and semaphores
+// Initialize simulation state and create semaphores
 STATUS sim_init(Simulation *sim, const Config *config) {
   if (sim == NULL || config == NULL)
     return STATUS_NULL_PTR;
 
+  // Copy config and reset counters
   sim->config = *config;
   sim->current_time = 0;
   sim->customers_generated = 0;
@@ -27,6 +29,7 @@ STATUS sim_init(Simulation *sim, const Config *config) {
   sim->simulation_finished = 0;
   sim->interrupted = 0;
 
+  // Init cashiers and queues
   for (int i = 0; i < NUM_CASHIERS; i++) {
     sim->cashiers[i].id = i;
     sim->cashiers[i].current_customer_id = -1;
@@ -41,6 +44,7 @@ STATUS sim_init(Simulation *sim, const Config *config) {
     sim->queues[i].total_wait_time = 0;
   }
 
+  // Reset statistics
   sim->stats.total_arrived = 0;
   sim->stats.total_served = 0;
   sim->stats.total_left_no_service = 0;
@@ -51,6 +55,7 @@ STATUS sim_init(Simulation *sim, const Config *config) {
   sim->stats.simulation_end_time = 0;
 
 #ifdef USE_NAMED_SEM
+  // Named semaphores: create in /dev/shm, one global per process
   sem_unlink("/sm_mutex_stats");
   sem_unlink("/sm_mutex_time");
   g_mutex_stats = sem_open("/sm_mutex_stats", O_CREAT, 0666, 1);
@@ -72,6 +77,7 @@ STATUS sim_init(Simulation *sim, const Config *config) {
     g_service_done[i] = sem_open(name, O_CREAT, 0666, 0);
   }
 #else
+  // Unnamed semaphores: stored directly in shared memory (pshared=1)
   sem_init(&sim->mutex_stats, 1, 1);
   sem_init(&sim->mutex_time, 1, 1);
   for (int i = 0; i < NUM_CASHIERS; i++) {
@@ -85,7 +91,7 @@ STATUS sim_init(Simulation *sim, const Config *config) {
   return STATUS_OK;
 }
 
-// Attach to existing named semaphores (used by independent processes)
+// Attach to existing named semaphores (for independent processes)
 void sim_attach_named_sems(Simulation *sim) {
   (void)sim;
 #ifdef USE_NAMED_SEM
@@ -107,7 +113,7 @@ void sim_attach_named_sems(Simulation *sim) {
 #endif
 }
 
-// Destroy/close and unlink all semaphores
+// Close and unlink all semaphores to free OS resources
 void sim_destroy(Simulation *sim) {
   if (sim == NULL)
     return;
@@ -140,6 +146,7 @@ void sim_destroy(Simulation *sim) {
     sem_unlink(name);
   }
 #else
+  // Destroy unnamed semaphores in shared memory
   sem_destroy(&sim->mutex_stats);
   sem_destroy(&sim->mutex_time);
   for (int i = 0; i < NUM_CASHIERS; i++) {
@@ -152,7 +159,7 @@ void sim_destroy(Simulation *sim) {
 #endif
 }
 
-// Get customer pointer by ID
+// Get customer pointer by ID (with bounds check)
 Customer *sim_get_customer(Simulation *sim, int id) {
   if (!sim || id < 0 || id >= sim->customers_generated)
     return NULL;
