@@ -139,7 +139,7 @@ STATUS config_validate(const Config *config) {
   }
 
   // Check positive values and valid ranges
-  if (config->total_customers <= 0) {
+  if (config->total_customers <= 0 || config->total_customers > MAX_CUSTOMERS) {
     return STATUS_ERROR;
   }
 
@@ -164,6 +164,9 @@ STATUS config_validate(const Config *config) {
     return STATUS_ERROR;
   }
   if (config->display_delay_ms < 0) {
+    return STATUS_ERROR;
+  }
+  if (config->time_scale <= 0) {
     return STATUS_ERROR;
   }
 

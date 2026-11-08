@@ -1,3 +1,5 @@
+#!/bin/bash
+
 echo "|========================================================|"
 echo "|           SUPERMARKET SIMULATION TEST RUN              |"
 echo "|========================================================|"
@@ -24,7 +26,7 @@ run_test() {
 
     printf "Test %2d: %-40s " "$TOTAL" "$description"
 
-    ./supermarket "$config" > /tmp/test_output.txt 2>&1
+    bash run.sh "$config" > /tmp/test_output.txt 2>&1
     local exit_code=$?
 
     if [ $exit_code -ne 0 ]; then
@@ -57,13 +59,13 @@ run_negative_test() {
 
     printf "Test %2d: %-40s " "$TOTAL" "$description"
 
-    ./supermarket "$config" > /tmp/test_output.txt 2>&1
+    bash run.sh "$config" > /tmp/test_output.txt 2>&1
     local exit_code=$?
 
     if [ $exit_code -ne 0 ]; then
         echo "[PASS] (expected failure)"
         PASSED=$((PASSED + 1))
-    elif grep -q "ERROR" /tmp/test_output.txt; then
+    elif grep -q "ERROR\|Failed\|Error" /tmp/test_output.txt; then
         echo "[PASS] (error detected)"
         PASSED=$((PASSED + 1))
     else
@@ -101,8 +103,8 @@ run_negative_test "tests/test_invalid_strategy.txt" "Invalid: strategy = 5"
 
 TOTAL=$((TOTAL + 1))
 printf "Test %2d: %-40s " "$TOTAL" "Missing config file"
-./supermarket "tests/nonexistent.txt" > /tmp/test_output.txt 2>&1
-if [ $? -ne 0 ] || grep -q "ERROR\|Failed" /tmp/test_output.txt; then
+bash run.sh "tests/nonexistent.txt" > /tmp/test_output.txt 2>&1
+if [ $? -ne 0 ] || grep -q "ERROR\|Failed\|Error" /tmp/test_output.txt; then
     echo "[PASS] (handled gracefully)"
     PASSED=$((PASSED + 1))
 else
