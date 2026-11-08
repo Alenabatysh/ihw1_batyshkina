@@ -1,45 +1,53 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Werror -Iinclude -MMD -MP
-LDFLAGS = -lpthread
+LDFLAGS = 
 
 SRC_DIR = src
 BUILD_DIR = build
-TARGET_SEM = supermarket
-TARGET_COND = supermarket_condvar
 
 SRCS = $(wildcard $(SRC_DIR)/*.c)
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
-OBJS_COND = $(SRCS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.cond.o)
+OBJS_NAMED = $(SRCS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.named.o)
+DEPS = $(OBJS:.o=.d) $(OBJS_NAMED:.o=.d)
 
-.PHONY: all clean run test
+.PHONY: all clean run test help
 
-all: $(TARGET_SEM) $(TARGET_COND)
-	@echo "Build complete: $(TARGET_SEM) (semaphores) and $(TARGET_COND) (condvars)"
+all: supermarket supermarket_named
+	@echo "Build complete: supermarket (unnamed) and supermarket_named (named)"
 
-$(TARGET_SEM): $(BUILD_DIR) $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS)
+supermarket: $(BUILD_DIR) $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS)
 
-$(TARGET_COND): $(BUILD_DIR) $(OBJS_COND)
-	$(CC) $(CFLAGS) -DUSE_CONDVAR $(LDFLAGS) -o $@ $(OBJS_COND)
+supermarket_named: $(BUILD_DIR) $(OBJS_NAMED)
+	$(CC) $(CFLAGS) -DUSE_NAMED_SEM -o $@ $(OBJS_NAMED) $(LDFLAGS)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/%.cond.o: $(SRC_DIR)/%.c
-	$(CC) $(CFLAGS) -DUSE_CONDVAR -c $< -o $@
+$(BUILD_DIR)/%.named.o: $(SRC_DIR)/%.c
+	$(CC) $(CFLAGS) -DUSE_NAMED_SEM -c $< -o $@
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET_SEM) $(TARGET_COND) simulation.log
+	rm -rf $(BUILD_DIR) supermarket supermarket_named simulation.log
 	@echo "Cleaned"
 
-run: $(TARGET_SEM)
-	./$(TARGET_SEM) tests/test_small.txt
+run: all
+	@echo "Starting independent processes via run.sh..."
+	@chmod +x run.sh
+	./run.sh
 
-test: $(TARGET_SEM)
+test: all
 	@echo "Running tests..."
 	@bash tests/run_tests.sh
+
+help:
+	@echo "Available targets:"
+	@echo "  make all     - Build both binaries (unnamed and named semaphores)"
+	@echo "  make run     - Run the simulation using run.sh (independent processes)"
+	@echo "  make test    - Run the test suite"
+	@echo "  make clean   - Remove build artifacts and binaries"
 
 -include $(DEPS)

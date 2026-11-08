@@ -1,6 +1,7 @@
 build/
 supermarket
 supermarket_condvar
+supermarket_named
 simulation.log
 *.o
 *.d
