@@ -188,14 +188,19 @@ int main(int argc, char *argv[]) {
       if (sim->interrupted)
         break;
 
-      // Update shared current_time and arrival counter under lock
+      // Update the model clock while holding the time mutex.
       sem_wait(MUTEX_TIME);
       sim->current_time += interval;
-      sim->stats.total_arrived++;
+      sim->customers[i].arrival_time = sim->current_time;
       sem_post(MUTEX_TIME);
 
+      // The arrival counter is part of the shared statistics and must use
+      // the same mutex as all other readers and writers of simulation stats.
+      sem_wait(MUTEX_STATS);
+      sim->stats.total_arrived++;
+      sem_post(MUTEX_STATS);
+
       sim->customers[i].id = i;
-      sim->customers[i].arrival_time = sim->current_time;
       sim->customers[i].items_count =
           rng_range(sim->config.items_min, sim->config.items_max);
 

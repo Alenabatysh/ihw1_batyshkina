@@ -81,13 +81,12 @@ static void close_client(ServerClient *client) {
 }
 
 // Adds data to the client's output buffer without blocking the event loop.
-// If a slow observer falls behind, stale snapshots are discarded and only
-// the newest state is retained.
+// If a slow observer fills its buffer, return an error so only that observer
+// is disconnected. This avoids dropping part of a line-oriented TCP message.
 static int queue_output(ServerClient *client, const char *data, size_t length) {
-  if (length > sizeof(client->output))
+  if (length > sizeof(client->output) ||
+      client->output_length > sizeof(client->output) - length)
     return -1;
-  if (client->output_length + length > sizeof(client->output))
-    client->output_length = 0;
   memcpy(client->output + client->output_length, data, length);
   client->output_length += length;
   return 0;
