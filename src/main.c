@@ -1,6 +1,7 @@
 #include "config.h"
 #include "display.h"
 #include "io.h"
+#include "network.h"
 #include "rng.h"
 #include "simulation.h"
 #include "types.h"
@@ -41,7 +42,9 @@ void sigint_handler(int sig) {
 int main(int argc, char *argv[]) {
   if (argc < 2) {
     printf("Usage: %s <role> [args]\n", argv[0]);
-    printf("Roles: init, display, cashier <id>, generator, cleanup\n");
+    printf(
+        "Roles: init, display, publisher <server_ip> <port>, cashier <id>,\n");
+    printf("       generator, cleanup\n");
     return 1;
   }
 
@@ -124,6 +127,11 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
+  if (strcmp(role, "publisher") == 0 && argc != 4) {
+    fprintf(stderr, "Usage: %s publisher <server_ip> <port>\n", argv[0]);
+    return 1;
+  }
+
   // attach to already existing shared memory
   shm_fd = shm_open(SHM_NAME, O_RDWR, 0666);
   if (shm_fd == -1) {
@@ -144,8 +152,12 @@ int main(int argc, char *argv[]) {
   sa.sa_flags = 0;
   sigaction(SIGINT, &sa, NULL);
 
-  // display
-  if (strcmp(role, "display") == 0) {
+  // publisher: periodically sends an integrated state snapshot to TCP server
+  if (strcmp(role, "publisher") == 0 && argc > 3) {
+    (void)network_publish_simulation(sim, argv[2], argv[3]);
+  }
+  // display (legacy local dashboard from IDZ-3)
+  else if (strcmp(role, "display") == 0) {
     display_init();
     while (!sim->simulation_finished && !sim->interrupted) {
       display_render(sim);
@@ -176,14 +188,19 @@ int main(int argc, char *argv[]) {
       if (sim->interrupted)
         break;
 
-      // Update shared current_time and arrival counter under lock
+      // Update the model clock while holding the time mutex.
       sem_wait(MUTEX_TIME);
       sim->current_time += interval;
-      sim->stats.total_arrived++;
+      sim->customers[i].arrival_time = sim->current_time;
       sem_post(MUTEX_TIME);
 
+      // The arrival counter is part of the shared statistics and must use
+      // the same mutex as all other readers and writers of simulation stats.
+      sem_wait(MUTEX_STATS);
+      sim->stats.total_arrived++;
+      sem_post(MUTEX_STATS);
+
       sim->customers[i].id = i;
-      sim->customers[i].arrival_time = sim->current_time;
       sim->customers[i].items_count =
           rng_range(sim->config.items_min, sim->config.items_max);
 

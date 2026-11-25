@@ -100,6 +100,7 @@ run_negative_test "tests/test_invalid_negative.txt" "Invalid: negative values"
 run_negative_test "tests/test_invalid_zero.txt" "Invalid: zero customers"
 run_negative_test "tests/test_invalid_range.txt" "Invalid: min > max"
 run_negative_test "tests/test_invalid_strategy.txt" "Invalid: strategy = 5"
+run_negative_test "tests/test_invalid_capacity_overflow.txt" "Invalid: queue capacity exceeds storage"
 
 TOTAL=$((TOTAL + 1))
 printf "Test %2d: %-40s " "$TOTAL" "Missing config file"

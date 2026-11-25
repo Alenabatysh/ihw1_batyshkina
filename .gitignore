@@ -5,3 +5,5 @@ supermarket_named
 simulation.log
 *.o
 *.d
+supermarket_server
+supermarket_client

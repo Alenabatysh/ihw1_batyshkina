@@ -143,7 +143,8 @@ STATUS config_validate(const Config *config) {
     return STATUS_ERROR;
   }
 
-  if (config->queue_capacity <= 0) {
+  if (config->queue_capacity <= 0 ||
+      config->queue_capacity > MAX_QUEUE_CAPACITY) {
     return STATUS_ERROR;
   }
   if (config->shopping_time_min <= 0 ||
