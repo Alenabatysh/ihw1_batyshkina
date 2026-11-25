@@ -1,0 +1,14 @@
+# Test: min > max should be rejected
+total_customers = 10
+queue_capacity = 5
+shopping_time_min = 20
+shopping_time_max = 10
+arrival_interval_min = 1
+arrival_interval_max = 3
+items_min = 1
+items_max = 3
+item_service_time = 5
+queue_strategy = 0
+work_day_duration = 300
+random_seed = 42
+display_delay_ms = 0

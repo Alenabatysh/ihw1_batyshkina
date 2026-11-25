@@ -1,0 +1,4 @@
+# Partial configuration - missing parameters should use defaults
+total_customers = 20
+queue_capacity = 3
+queue_strategy = 1

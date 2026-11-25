@@ -1,0 +1,15 @@
+# Long enough to exercise observer disconnect/reconnect while the model runs.
+total_customers = 45
+queue_capacity = 10
+shopping_time_min = 5
+shopping_time_max = 10
+arrival_interval_min = 1
+arrival_interval_max = 2
+items_min = 1
+items_max = 3
+item_service_time = 3
+queue_strategy = 0
+work_day_duration = 300
+random_seed = 42
+display_delay_ms = 50
+time_scale = 60

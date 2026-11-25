@@ -1,0 +1,14 @@
+# Test: large values for stress testing
+total_customers = 500
+queue_capacity = 50
+shopping_time_min = 10
+shopping_time_max = 60
+arrival_interval_min = 1
+arrival_interval_max = 5
+items_min = 1
+items_max = 20
+item_service_time = 15
+queue_strategy = 0
+work_day_duration = 7200
+random_seed = 12345
+display_delay_ms = 0
